@@ -1,0 +1,136 @@
+---
+title: "Tidy Data Practice"
+author: "Christopher Han"
+date: "February 20, 2019"
+output:
+  html_document:
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+This is a simple exercise of importing raw data and transforming it into tidy data and is part of the week 4 assignment in Getting and Cleaning Data from Data Science Specialization by Johns Hopkins University on Coursera.
+
+The [dataset](http://archive.ics.uci.edu/ml/datasets/Human+Activity+Recognition+Using+Smartphones) used is from UCI Machine Learning Repository on the topic of "Human Activity Recognition Using Smartphones Data Set". 
+
+There are two files used for this exercise: functions.R and run_analysis.R
+
+### functions.R
+
+This script contains two functions used in run_analysis.R.  
+
+1. cleandata() - imports the raw files, combines them into one data frame and formatted to be tidy.
+
+```{r cleandata, cache = TRUE, results = FALSE}
+cleandata <- function(){
+        # Read data
+        setwd("C:/Users/Chris Han/tidy-data-practice/UCI HAR Dataset")
+        features <- read.table("features.txt", stringsAsFactors = FALSE)
+        train <- read.table("train/X_train.txt")
+        trainlabels <- read.table("train/y_train.txt")
+        trainsubject <- read.table("train/subject_train.txt")
+        test <- read.table("test/X_test.txt")
+        testlabels <- read.table("test/y_test.txt")
+        testsubject <- read.table("test/subject_test.txt")
+        
+        # Assign feature names to columns, choose only features with mean/std
+        colnames(train) <- features$V2
+        trainmeanstdcol <- grepl("mean()\\b|std()\\b", colnames(train))
+        sum(trainmeanstdcol)
+        train <- train[,trainmeanstdcol]
+        train <- cbind(trainlabels, train)
+        train <- cbind(trainsubject, train)
+        
+        # Repeat for test data
+        colnames(test) <- features$V2
+        testmeanstdcol <- grepl("mean()\\b|std()\\b", colnames(test))
+        sum(testmeanstdcol)
+        test <- test[,testmeanstdcol]
+        test <- cbind(testlabels, test)
+        test <- cbind(testsubject, test)
+        
+        # Combine train and test data
+        fulldata <- rbind(train, test)
+        colnames(fulldata)[1] <- "subject"
+        colnames(fulldata)[2] <- "activity"
+        fulldata
+}
+```
+
+\newpage
+
+2. labeldescriptivename() - modifies the column names to be more descriptive and easier to interpret.
+
+```{r label, cache = TRUE, results= FALSE}
+labeldescriptivename <- function(fulldata){
+        renamedata <- fulldata
+        colnames(renamedata)
+        colnames(renamedata) <- tolower(colnames(renamedata))
+        colnames(renamedata) <- gsub("-", "", colnames(renamedata))
+        colnames(renamedata) <- sub("^t", "TimeDomain", colnames(renamedata))
+        colnames(renamedata) <- sub("^f", "FrequencyDomain", colnames(renamedata))
+        colnames(renamedata) <- sub("acc", "Acceleration", colnames(renamedata))
+        colnames(renamedata) <- sub("()", "", colnames(renamedata), fixed = TRUE)
+        colnames(renamedata) <- sub("mag", "Magnitude", colnames(renamedata))
+        colnames(renamedata) <- gsub("body", "Body", colnames(renamedata))
+        colnames(renamedata) <- sub("gravity", "Gravity", colnames(renamedata))
+        colnames(renamedata) <- sub("x$", "_X_Axis", colnames(renamedata))
+        colnames(renamedata) <- sub("y$", "_Y_Axis", colnames(renamedata))
+        colnames(renamedata) <- sub("z$", "_Z_Axis", colnames(renamedata))
+        colnames(renamedata) <- sub("mean", "_Mean", colnames(renamedata))
+        colnames(renamedata) <- sub("std", "_StandardDeviation", colnames(renamedata))
+        colnames(renamedata) <- sub("gyro", "Gyroscope", colnames(renamedata))
+        colnames(renamedata) <- sub("jerk", "Jerk", colnames(renamedata))
+        colnames(renamedata) <- sub("BodyBody", "Body", colnames(renamedata))
+        colnames(renamedata)[2] <- "activity"
+        renamedata
+}
+```
+
+### run_analysis.R
+
+This script accomplishes 5 things.
+
+1. Merges the training and the test sets to create one data set.
+2. Extracts only the measurements on the mean and standard deviation for each measurement.
+3. Uses descriptive activity names to name the activities in the data set
+4. Appropriately labels the data set with descriptive variable names.
+5. From the data set in step 4, creates a second, independent tidy data set with the average of each variable for each activity and each subject.
+
+```{r analysis, cache = TRUE, message = FALSE}
+library(dplyr)
+setwd("C:/Users/Chris Han/tidy-data-practice")
+source("functions.R")
+setwd("C:/Users/Chris Han/tidy-data-practice/UCI HAR Dataset")
+
+# 1 and 2
+# Merges the training and the test sets to create one data set.
+# Extracts only the measurements on the mean and standard deviation for each measurement. 
+
+fulldata <- cleandata()
+
+# 3 
+# Uses descriptive activity names to name the activities in the data set
+fulldata$activity <- factor(fulldata$activity, levels = c(1,2,3,4,5,6),
+                            labels = c("walking", "walking upstairs", 
+                                       "walking downstairs", "sitting", 
+                                       "standing", "laying"))
+
+# 4
+# Appropriately labels the data set with descriptive variable names.
+
+renamedata <- labeldescriptivename(fulldata)
+
+# 5
+# From the data set in step 4, creates a second, independent tidy data set with 
+# the average of each variable for each activity and each subject.
+
+newdata <- renamedata %>%
+                group_by(subject, activity) %>%
+                        summarise_all(mean)
+
+newdata
+```
+
